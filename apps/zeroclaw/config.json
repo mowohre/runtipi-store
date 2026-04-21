@@ -1,0 +1,51 @@
+{
+  "name": "ZeroClaw",
+  "id": "zeroclaw",
+  "short_desc": "Fast, small, and fully autonomous AI personal assistant infrastructure",
+  "description": "ZeroClaw is a personal AI assistant you run on your own devices. It answers you on the channels you already use (WhatsApp, Telegram, Slack, Discord, Signal, iMessage, Matrix,>
+  "tipi_version": "1",
+  "source": "https://github.com/zeroclaw-labs/zeroclaw",
+  "available": true,
+  "exposable": true,
+  "dynamic_config": true,
+  "form_fields": [
+    {
+      "type": "text",
+      "label": "API Key",
+      "env_variable": "API_KEY",
+      "required": true,
+      "max": 200,
+      "min": 10,
+      "hint": "Your LLM provider API key (OpenAI, Anthropic, OpenRouter, etc.)"
+    },
+    { 
+      "type": "select",
+      "label": "Provider",
+      "env_variable": "PROVIDER",
+      "options": [
+        { "label": "OpenRouter (default)", "value": "openrouter" },
+        { "label": "OpenAI", "value": "openai" },
+        { "label": "Anthropic", "value": "anthropic" },
+        { "label": "Ollama", "value": "ollama" }
+      ],
+      "default": "openrouter"
+    },
+    { 
+      "type": "text",
+      "label": "Model (Optional)",
+      "env_variable": "ZEROCLAW_MODEL",
+      "required": false,
+      "hint": "Override the default model (e.g., anthropic/claude-sonnet-4-20250514)"
+    },
+    { 
+      "type": "text",
+      "label": "Host Port",
+      "env_variable": "HOST_PORT",
+      "default": "42617",
+      "required": false,
+      "hint": "Host port for the gateway (default: 42617)"
+    }
+  ]
+}
+
+
