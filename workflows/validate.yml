@@ -1,0 +1,128 @@
+# .github/workflows/validate.yml
+name: Validate App Store
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate app store structure
+        run: |
+          # Check that apps directory exists
+          if [ ! -d "apps" ]; then
+            echo "Error: apps directory not found"
+            exit 1
+          fi
+          
+          # Check that metadata.json exists
+          if [ ! -f "metadata.json" ]; then
+            echo "Error: metadata.json not found"
+            exit 1
+          fi
+          
+          echo "App store structure is valid"
+
+      - name: Validate each app
+        run: |
+          for app_dir in apps/*/; do
+            app_name=$(basename "$app_dir")
+            echo "Validating app: $app_name"
+            
+            # Check required files
+            if [ ! -f "$app_dir/config.json" ]; then
+              echo "Error: config.json missing for $app_name"
+              exit 1
+            fi
+            
+            if [ ! -f "$app_dir/docker-compose.yml" ] && [ ! -f "$app_dir/docker-compose.json" ]; then
+              echo "Error: docker-compose.yml missing for $app_name"
+              exit 1
+            fi
+            
+            # Check metadata folder
+            if [ ! -d "$app_dir/metadata" ]; then
+              echo "Error: metadata folder missing for $app_name"
+              exit 1
+            fi
+            
+            # Validate JSON
+            if ! jq empty "$app_dir/config.json" 2>/dev/null; then
+              echo "Error: Invalid JSON in config.json for $app_name"
+              exit 1
+            fi
+            
+            # Validate required config fields
+            required_fields=("id" "name" "version" "categories")
+            for field in "${required_fields[@]}"; do
+              if ! jq -e ".$field" "$app_dir/config.json" > /dev/null 2>&1; then
+                echo "Error: Missing required field '$field' in config.json for $app_name"
+                exit 1
+              fi
+            done
+            
+            # Check that folder name matches id
+            app_id=$(jq -r '.id' "$app_dir/config.json")
+            if [ "$app_name" != "$app_id" ]; then
+              echo "Error: Folder name '$app_name' does not match id '$app_id'"
+              exit 1
+            fi
+            
+            echo "✓ $app_name is valid"
+          done
+          
+          echo "All apps validated successfully"
+
+      - name: Check for duplicate ports
+        run: |
+          echo "Checking for duplicate ports..."
+          ports=$(jq -r '.port' apps/*/config.json | sort | uniq -d)
+          if [ -n "$ports" ]; then
+            echo "Warning: Duplicate ports found: $ports"
+          else
+            echo "No duplicate ports found"
+          fi
+
+      - name: Validate docker-compose files
+        run: |
+          # Install docker-compose validation
+          pip install docker-compose --quiet || true
+          
+          for app_dir in apps/*/; do
+            if [ -f "$app_dir/docker-compose.yml" ]; then
+              # Basic YAML validation
+              python3 -c "import yaml; yaml.safe_load(open('$app_dir/docker-compose.yml'))" || {
+                echo "Error: Invalid YAML in $app_dir/docker-compose.yml"
+                exit 1
+              }
+            fi
+          done
+          
+          echo "All docker-compose files are valid YAML"
+
+  summary:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## App Store Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Validation completed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Apps in store:" >> $GITHUB_STEP_SUMMARY
+          for app_dir in apps/*/; do
+            app_name=$(basename "$app_dir")
+            app_version=$(jq -r '.version' "$app_dir/config.json" 2>/dev/null || echo "unknown")
+            echo "- **$app_name** (v$app_version)" >> $GITHUB_STEP_SUMMARY
+          done
